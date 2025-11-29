@@ -1,0 +1,12 @@
+{
+  "conversion_tools_path": "support/osx/libdskcpmtools",
+  "last_host_folder": "/Users/kevincarr/projects/python/FlashFloppyHelper",
+  "last_image_folder": "/Volumes/AppleShare/VintageComputers/Kaypro",
+  "configurations_path": "configurations",
+  "disk_format": "ATARIST",
+  "staging_folder": "/Users/kevincarr/projects/python/FlashFloppyHelper/staging",
+  "tele.convparams": "dskdump -itype tele -otype imd {infile} {outfile}",
+  "imd.convparams": "dskdump -itype imd -otype edsk {infile} {outfile}",
+  "dsk.convparams": "dskdump -itype dsk -otype imd {infile} {outfile}",
+  "imagedisk_command": "dskdump -itype imd -otype dsk {infile} {outfile}"
+}
