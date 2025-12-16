@@ -1,0 +1,4 @@
+FINALFORMAT:HFE
+IMD->HFE:"hxcfloppyemulator/hxcfe -finput:{infile} -conv:HXC_HFE -foutput:{outfile}"
+DSK->HFE:"hxcfloppyemulator/hxcfe -finput:{infile} -conv:HXC_HFE -foutput:{outfile}"
+DMK->HFE:"hxcfloppyemulator/hxcfe -finput:{infile} -conv:HXC_HFE -foutput:{outfile}"

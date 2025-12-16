@@ -6,6 +6,7 @@ import subprocess
 import ffhelper_prefs as prefs
 import shlex
 from ffhelper_utils import get_resource_path
+import ffhelper_utils as utils  # ensure list_files is available
 import logging
 
 logger = logging.getLogger(__name__)
@@ -181,6 +182,56 @@ def delete_file(full_path):
         raise FileNotFoundError(f"File does not exist: {full_path}")
 
     os.remove(full_path)
+    
+def export_files(staging_path, configurations_path, out_folder, target_ext, prefs):
+    """
+    Export all files from staging and configuration folders to out_folder.
+
+    staging_path: path to staging folder
+    configurations_path: path to configuration folder
+    out_folder: output folder chosen by user
+    target_ext: target extension string (e.g., '.dsk', '.imd'), or None to keep original
+    prefs: preference module to get conversion templates/tools_path
+    """
+
+    os.makedirs(out_folder, exist_ok=True)
+
+    # ----------------------------
+    # Copy configuration files (always as-is)
+    # ----------------------------
+    if configurations_path and os.path.exists(configurations_path):
+        for f in os.listdir(configurations_path):
+            src = os.path.join(configurations_path, f)
+            if os.path.isfile(src):
+                copy_file_to_dir(src, out_folder)
+
+    # ----------------------------
+    # Copy or convert staging files
+    # ----------------------------
+    staging_files = utils.list_files(staging_path)  # [(filename, size), ...]
+    for fname, _ in staging_files:
+        src_file = os.path.join(staging_path, fname)
+        base, ext = os.path.splitext(fname)
+        ext = ext.lower()
+
+        # Determine destination filename
+        if target_ext is '':
+            # Keep original type
+            dest_file = os.path.join(out_folder, fname)
+        else:
+            dest_file = os.path.join(out_folder, base + target_ext)
+
+        if target_ext is '' or ext == target_ext:
+            # Copy directly
+            copy_file_to_dir(src_file, out_folder)
+        else:
+            # Conversion required
+            cmd_template = prefs.get_pref("imd.convparams", "")
+            tools_path = prefs.get_pref("conversion_tools_path", "")
+            convert_imd_to_dsk(cmd_template, tools_path, src_file, dest_file)
+
+    return out_folder
+
 
 
 

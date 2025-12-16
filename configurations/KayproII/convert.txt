@@ -1,0 +1,4 @@
+FINALFORMAT:DSK
+TD0->IMD:"libdskcpmtools/dskdump -itype tele -otype imd {infile} {outfile}"
+IMD->DSK:"libdskcpmtools/dskdump -itype imd -otype edsk {infile} {outfile}"
+

@@ -3,6 +3,7 @@ import platform
 import logging
 import sys
 from tkinter import messagebox
+import tkinter as tk
 
 logger = logging.getLogger(__name__)
 
@@ -116,3 +117,24 @@ def parse_size(value):
         return int(str(value).replace(',', '').strip())
     except (ValueError, TypeError):
         return 0
+    
+def create_modal_toplevel(parent, width, height, title=""):
+    """
+    Create a modal, centered Toplevel window.
+
+    Returns the Toplevel instance.
+    """
+    top = tk.Toplevel(parent)
+    top.title(title)
+    top.transient(parent)   # keep on top of parent
+    top.grab_set()          # make modal
+
+    # Center the window
+    parent.update_idletasks()
+    x = parent.winfo_x() + (parent.winfo_width() // 2) - (width // 2)
+    y = parent.winfo_y() + (parent.winfo_height() // 2) - (height // 2)
+    top.geometry(f"{width}x{height}+{x}+{y}")
+
+    return top
+
+

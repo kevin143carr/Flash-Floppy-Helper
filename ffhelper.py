@@ -1,13 +1,13 @@
 # viewcpm.py
 import os
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
 import threading
 import ffhelper_logic as logic
 import ffhelper_prefs as prefs
 import ffhelper_utils as utils
 import logging
 import platform
+from tkinter import ttk, filedialog, messagebox, scrolledtext
 from diskmanager import DiskImageManager
 from ffhelper_configurations import ConfigurationsManager
 from ffhelper_utils import get_resource_path
@@ -173,9 +173,16 @@ class FlashFloppyHelper(tk.Tk):
         # ----------------------------
         
         # --- Export Button ---
-        export_btn = ttk.Button(toolbar, text="Export", command=self.export_to_dsk)
+        export_btn = ttk.Button(toolbar, text="Export", command=self.export_files_dialog)
         export_btn.pack(side=tk.LEFT, padx=2)
-        create_tooltip(export_btn, "Export Files and Configs")        
+        create_tooltip(export_btn, "Export Files and Configs")
+        
+        
+        # --- View Log Button (new) ---
+        log_btn = ttk.Button(toolbar, text="View Log",
+                             command=self.open_log_window)
+        log_btn.pack(side=tk.RIGHT, padx=2)
+        create_tooltip(log_btn, "View application log file")
     
         settings_btn = ttk.Button(toolbar, text="Preferences",
                                   command=lambda: prefs.open_prefs_dialog(self))
@@ -238,6 +245,37 @@ class FlashFloppyHelper(tk.Tk):
 
     def status_callback(self, msg):
         self.status_var.set(msg)
+        
+
+    # ----------------------------
+    # Open Log File Window
+    # ----------------------------
+    def open_log_window(self):
+        """Open a new window showing contents of LOGFILE."""
+    
+        if not os.path.exists(LOGFILE):
+            messagebox.showerror(
+                "Log File Missing",
+                f"Log file does not exist:\n{LOGFILE}",
+                parent=self
+            )
+            return
+    
+        win = tk.Toplevel(self)
+        win.title("Log Viewer")
+        win.geometry("800x500")
+    
+        text = scrolledtext.ScrolledText(win, wrap="none", font=("Courier", 17))
+        text.pack(fill="both", expand=True)
+    
+        try:
+            with open(LOGFILE, "r", encoding="utf-8") as f:
+                content = f.read()
+        except Exception as e:
+            content = f"Error reading log:\n{e}"
+    
+        text.insert("1.0", content)
+        text.config(state="disabled")    
 
     # ----------------------------
     # Event Bindings
@@ -246,38 +284,57 @@ class FlashFloppyHelper(tk.Tk):
         # Drag-and-drop can be implemented later
         pass
     
-    def export_to_dsk(self):
+    def export_files_dialog(self):
+        """Prompt user for output folder and file type, then export all staging/config files."""
         try:
-            # Ensure a disk image is loaded
-            if not self.disk_manager.get_current_staging_path():
-                messagebox.showerror("Error", "No IMD image loaded.")
+            staging_path = self.disk_manager.get_current_staging_path()
+            if not staging_path:
+                messagebox.showerror("Error", "No staging folder loaded.", parent=self)
                 return
-            
-            current_imd_path = self.disk_manager.get_current_staging_path()
     
-            # Pull settings from preferences
-            cmd_template = self.prefs.get_pref("imd.convparams", "")
-            tools_path = self.prefs.get_pref("conversion_tools_path", "")
+            # Select output folder
+            out_folder = filedialog.askdirectory(parent=self, title="Select Output Folder")
+            if not out_folder:
+                return
     
-            # Ask user where to save the DSK file
-            default_name = os.path.splitext(os.path.basename(current_imd_path))[0]
-            out_path = filedialog.asksaveasfilename(parent=self, 
-                defaultextension=".dsk",
-                filetypes=[("DSK Files", "*.dsk")],
-                initialfile=default_name,
-                title="Save DSK File"
+            # ----------------------------
+            # File type selection dialog
+            # ----------------------------
+            file_type_options = [("DSK Files", ".dsk"), ("IMD Files", ".imd"), ("Keep Original", '')]
+            top = utils.create_modal_toplevel(self, width=300, height=150, title="Select File Type")
+    
+            tk.Label(top, text="Select Export File Type:").pack(pady=10)
+            file_type_var = tk.StringVar(value=None)
+    
+            for text, value in file_type_options:
+                tk.Radiobutton(top, text=text, variable=file_type_var, value=value).pack(anchor="w", padx=20)
+    
+            def on_ok():
+                top.destroy()
+    
+            tk.Button(top, text="OK", command=on_ok).pack(pady=10)
+    
+            # Wait for user to close dialog
+            self.wait_window(top)
+    
+            target_ext = file_type_var.get()  # e.g., '.dsk', '.imd', or None
+    
+            # ----------------------------
+            # Call export logic
+            # ----------------------------
+            logic.export_files(
+                staging_path=staging_path,
+                configurations_path=os.path.join(self.configurations_path,self.disk_format_var.get()),
+                out_folder=out_folder,
+                target_ext=target_ext,
+                prefs=self.prefs
             )
     
-            if not out_path:
-                return  # user canceled
-    
-            # Convert IMD → DSK
-            final_path = logic.convert_imd_to_dsk(cmd_template, tools_path, current_imd_path, out_path)
-    
-            messagebox.showinfo("Export Complete", f"Exported to:\n{final_path}", parent=self)
+            messagebox.showinfo("Export Complete", f"Files exported to:\n{out_folder}", parent=self)
     
         except Exception as e:
-            messagebox.showerror("Export Error", str(e))
+            messagebox.showerror("Export Error", str(e), parent=self)
+    
     
     # ----------------------------
     # Disk Format Selection
