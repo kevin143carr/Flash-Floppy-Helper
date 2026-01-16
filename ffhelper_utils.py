@@ -2,7 +2,7 @@ import os
 import platform
 import logging
 import sys
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 import tkinter as tk
 
 logger = logging.getLogger(__name__)
@@ -137,4 +137,33 @@ def create_modal_toplevel(parent, width, height, title=""):
 
     return top
 
+def parse_convert_file(path):
+    """
+    Reads a convert.txt file and returns:
+      - final_format: str, e.g., 'HFE'
+      - conversions: dict mapping source extensions to target format and command
+    """
+    final_format = None
+    conversions = {}
 
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"convert.txt not found at: {path}")
+
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if line.startswith("FINALFORMAT:"):
+                final_format = line.split(":", 1)[1].strip()
+            elif "->" in line:
+                left, right = line.split("->", 1)
+                target, cmd = right.split(":", 1)
+                source = left.strip().upper()
+                target = target.strip().upper()
+                cmd = cmd.strip().strip('"')
+                conversions[source] = {
+                    "target": target,
+                    "command": cmd
+                }
+    return final_format, conversions

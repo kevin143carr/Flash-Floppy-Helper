@@ -10,7 +10,7 @@ import platform
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 from diskmanager import DiskImageManager
 from ffhelper_configurations import ConfigurationsManager
-from ffhelper_utils import get_resource_path
+from ffhelper_utils import get_resource_path, parse_convert_file
 from ffhelper_logging import setup_logging
 
 LOGFILE = setup_logging()
@@ -285,55 +285,95 @@ class FlashFloppyHelper(tk.Tk):
         pass
     
     def export_files_dialog(self):
-        """Prompt user for output folder and file type, then export all staging/config files."""
+        """Prompt user for output folder, show conversion summary, and export all staging/config files automatically."""
         try:
+            # ----------------------------
+            # Get staging folder
+            # ----------------------------
             staging_path = self.disk_manager.get_current_staging_path()
             if not staging_path:
                 messagebox.showerror("Error", "No staging folder loaded.", parent=self)
                 return
     
-            # Select output folder
-            out_folder = filedialog.askdirectory(parent=self, title="Select Output Folder")
-            if not out_folder:
+            # ----------------------------
+            # Get selected disk format
+            # ----------------------------
+            selected_format = self.disk_format_combo.get()
+            if not selected_format:
+                messagebox.showerror("Error", "No disk format selected.", parent=self)
                 return
     
-            # ----------------------------
-            # File type selection dialog
-            # ----------------------------
-            file_type_options = [("DSK Files", ".dsk"), ("IMD Files", ".imd"), ("Keep Original", '')]
-            top = utils.create_modal_toplevel(self, width=300, height=150, title="Select File Type")
+            config_dir = os.path.join(self.configurations_path, selected_format)
+            convert_file = os.path.join(config_dir, "convert.txt")
     
-            tk.Label(top, text="Select Export File Type:").pack(pady=10)
-            file_type_var = tk.StringVar(value=None)
+            # ----------------------------
+            # Parse convert.txt
+            # ----------------------------
+            try:
+                final_format, conversions = parse_convert_file(convert_file)
+            except FileNotFoundError:
+                messagebox.showerror("Error", f"convert.txt not found in {config_dir}", parent=self)
+                return
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to read convert.txt:\n{e}", parent=self)
+                return
     
-            for text, value in file_type_options:
-                tk.Radiobutton(top, text=text, variable=file_type_var, value=value).pack(anchor="w", padx=20)
+            if not final_format:
+                messagebox.showerror("Error", "FINALFORMAT not defined in convert.txt", parent=self)
+                return
+    
+            target_ext = "." + final_format.lower()
+    
+            # ----------------------------
+            # Show conversion summary popup
+            # ----------------------------
+            summary_lines = [f"FINALFORMAT: {final_format}", "Conversions:"]
+            for src, rule in conversions.items():
+                summary_lines.append(f"{src} -> {rule['target']}")
+            summary_text = "\n".join(summary_lines)
+    
+            top = utils.create_modal_toplevel(self, width=400, height=200, title="Conversion Summary")
+            tk.Label(top, text="The following conversions will be applied:", font=("TkDefaultFont", 10, "bold")).pack(pady=5)
+            text_widget = tk.Text(top, width=50, height=10, wrap="none")
+            text_widget.insert("1.0", summary_text)
+            text_widget.config(state="disabled")
+            text_widget.pack(padx=10, pady=5, fill="both", expand=True)
+    
+            ok_pressed = tk.BooleanVar(value=False)
     
             def on_ok():
+                ok_pressed.set(True)
                 top.destroy()
     
             tk.Button(top, text="OK", command=on_ok).pack(pady=10)
-    
-            # Wait for user to close dialog
             self.wait_window(top)
     
-            target_ext = file_type_var.get()  # e.g., '.dsk', '.imd', or None
+            if not ok_pressed.get():
+                return  # user closed the window without pressing OK
+    
+            # ----------------------------
+            # Select output folder
+            # ----------------------------
+            out_folder = filedialog.askdirectory(parent=self, title="Select Output Folder")
+            if not out_folder:
+                return
     
             # ----------------------------
             # Call export logic
             # ----------------------------
             logic.export_files(
                 staging_path=staging_path,
-                configurations_path=os.path.join(self.configurations_path,self.disk_format_var.get()),
+                configurations_path=config_dir,
                 out_folder=out_folder,
                 target_ext=target_ext,
+                conversions=conversions,
                 prefs=self.prefs
             )
     
             messagebox.showinfo("Export Complete", f"Files exported to:\n{out_folder}", parent=self)
     
         except Exception as e:
-            messagebox.showerror("Export Error", str(e), parent=self)
+            messagebox.showerror("Export Error", str(e), parent=self)    
     
     
     # ----------------------------
